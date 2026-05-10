@@ -119,9 +119,12 @@ function Semaforo({ flujoAnual }) {
 function MesRow({ data, onChange }) {
   const noches = Math.round((data.ocup / 100) * 30);
   const ingreso = noches * data.tarifa;
+  const rowStyle = { borderBottom: `1px solid ${C.border}`, opacity: data.activo === false ? 0.4 : 1 };
   return (
-    <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-      <td style={{ padding: "8px 10px", color: C.textDim, fontSize: 12, fontWeight: 600, width: 40 }}>{data.mes}</td>
+    <tr style={rowStyle}>
+      <td style={{ padding: "8px 10px", color: C.textDim, fontSize: 12, fontWeight: 600, width: 40 }}>
+        {data.mes}{data.activo === false && <span style={{ fontSize: 10, color: C.muted, marginLeft: 4 }}>–</span>}
+      </td>
       <td style={{ padding: "4px 8px", width: 160 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ flex: 1, height: 3, background: C.border, borderRadius: 2, position: "relative" }}>
@@ -161,18 +164,20 @@ export default function App() {
   const [comisionPct,   setComisionPct]   = useState(3);
   const [mantenimiento, setMantenimiento] = useState(100000);
   const [meses, setMeses]                 = useState(MESES_DEFAULT);
+  const [mesInicio, setMesInicio]         = useState(1);
   const [tab, setTab]                     = useState("simulador");
 
   const calc = useMemo(() => {
     const egFijos = admin + servicios + internet + limpieza + amenities + mantenimiento;
 
-    const mensual = meses.map((m) => {
-      const noches   = Math.round((m.ocup / 100) * 30);
+    const mensual = meses.map((m, i) => {
+      const activo   = i >= mesInicio - 1;
+      const noches   = activo ? Math.round((m.ocup / 100) * 30) : 0;
       const ingBruto = noches * m.tarifa;
       const comision = ingBruto * (comisionPct / 100);
-      const egTotal  = hipoteca + egFijos + comision;
+      const egTotal  = hipoteca + egFijos + (activo ? comision : 0);
       const flujo    = ingBruto - egTotal;
-      return { ...m, noches, ingBruto, comision, egTotal, flujo };
+      return { ...m, noches, ingBruto, comision, egTotal, flujo, activo };
     });
 
     const ingAnual   = mensual.reduce((a, m) => a + m.ingBruto, 0);
@@ -244,6 +249,30 @@ export default function App() {
                 <span style={{ fontSize: 12, color: C.muted }}>Total egresos fijos/mes</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: C.red, fontVariantNumeric: "tabular-nums" }}>{fmt(hipoteca + calc.egFijos)}</span>
               </div>
+            </div>
+
+            {/* Mes de inicio */}
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Inicio de productividad</div>
+              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 8 }}>Meses previos: egresos sin ingresos</div>
+              <select
+                value={mesInicio}
+                onChange={(e) => setMesInicio(Number(e.target.value))}
+                style={{
+                  width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`,
+                  background: C.card, color: C.text, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  outline: "none", appearance: "none",
+                }}
+              >
+                {MESES_DEFAULT.map((m, i) => (
+                  <option key={i} value={i + 1}>{m.mes} (mes {i + 1})</option>
+                ))}
+              </select>
+              {mesInicio > 1 && (
+                <div style={{ marginTop: 8, fontSize: 11, color: C.amber }}>
+                  {mesInicio - 1} mes{mesInicio > 2 ? "es" : ""} sin ingresos · pérdida estimada: {fmtM((hipoteca + calc.egFijos) * (mesInicio - 1))}
+                </div>
+              )}
             </div>
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
               <div style={{ fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Punto de equilibrio</div>
