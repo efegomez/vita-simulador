@@ -23,18 +23,18 @@ const fmtM = (n) => `$${(n / 1_000_000).toFixed(2)}M`;
 
 // ─── MESES CON OCUPACIÓN DEFAULT ─────────────────────────────────────────────
 const MESES_DEFAULT = [
-  { mes: "Ene", ocup: 55, tarifa: 160000 },
-  { mes: "Feb", ocup: 60, tarifa: 165000 },
-  { mes: "Mar", ocup: 65, tarifa: 170000 },
-  { mes: "Abr", ocup: 70, tarifa: 185000 },
-  { mes: "May", ocup: 55, tarifa: 155000 },
-  { mes: "Jun", ocup: 58, tarifa: 160000 },
-  { mes: "Jul", ocup: 72, tarifa: 190000 },
-  { mes: "Ago", ocup: 70, tarifa: 185000 },
-  { mes: "Sep", ocup: 55, tarifa: 155000 },
-  { mes: "Oct", ocup: 58, tarifa: 160000 },
-  { mes: "Nov", ocup: 60, tarifa: 165000 },
-  { mes: "Dic", ocup: 85, tarifa: 240000 },
+  { mes: "Ene", ocup: 55, tarifa: 250000 },
+  { mes: "Feb", ocup: 60, tarifa: 250000 },
+  { mes: "Mar", ocup: 65, tarifa: 250000 },
+  { mes: "Abr", ocup: 70, tarifa: 250000 },
+  { mes: "May", ocup: 55, tarifa: 250000 },
+  { mes: "Jun", ocup: 58, tarifa: 250000 },
+  { mes: "Jul", ocup: 72, tarifa: 250000 },
+  { mes: "Ago", ocup: 70, tarifa: 250000 },
+  { mes: "Sep", ocup: 55, tarifa: 250000 },
+  { mes: "Oct", ocup: 58, tarifa: 250000 },
+  { mes: "Nov", ocup: 60, tarifa: 250000 },
+  { mes: "Dic", ocup: 85, tarifa: 250000 },
 ];
 
 // ─── SLIDER ──────────────────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ function computeAmortizacion(saldoInicial, tasaEA, plazoMeses, abonos) {
 
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
 export default function App() {
-  const [hipoteca,      setHipoteca]      = useState(1800000);
+  const [hipoteca,      setHipoteca]      = useState(2000000);
   const [admin,         setAdmin]         = useState(380000);
   const [servicios,     setServicios]     = useState(250000);
   const [internet,      setInternet]      = useState(80000);
@@ -208,7 +208,7 @@ export default function App() {
   const [comisionPct,   setComisionPct]   = useState(3);
   const [mantenimiento, setMantenimiento] = useState(100000);
   const [meses, setMeses]                 = useState(MESES_DEFAULT);
-  const [tarifaBase,    setTarifaBase]    = useState(170000);
+  const [tarifaBase,    setTarifaBase]    = useState(250000);
   const [ocupGlobal,    setOcupGlobal]    = useState(63);
   const [mesEntrega,    setMesEntrega]    = useState(3);
   const [mesArriendo,   setMesArriendo]   = useState(8);
@@ -254,9 +254,17 @@ export default function App() {
       ? Math.round(mesesActivos.reduce((a, m) => a + m.tarifa, 0) / mesesActivos.length) : 0;
     const roi           = (flujoAnual / 420_000_000) * 100;
 
+    // Año 1: parcial (fases reales). Años 2-5: 12 meses completos activos.
+    const ingMesActivo  = mesesActivos.length > 0 ? ingAnual / mesesActivos.length : 0;
+    const baseIngFull   = ingMesActivo * 12;
+    const baseEgFijosFull = (hipoteca + egFijos) * 12;
+
     const proyeccion = Array.from({ length: 5 }, (_, i) => {
-      const ing = ingAnual * Math.pow(1.07, i);
-      const eg  = egAnual  * Math.pow(1.05, i);
+      if (i === 0) return { año: "Año 1", ing: Math.round(ingAnual), eg: Math.round(egAnual), flujo: Math.round(ingAnual - egAnual) };
+      const growth   = Math.pow(1.07, i - 1); // año 2 = base sin crecimiento, año 3 = ×1.07, etc.
+      const ing      = baseIngFull * growth;
+      const comAnual = ing * (comisionPct / 100);
+      const eg       = baseEgFijosFull * Math.pow(1.05, i - 1) + comAnual;
       return { año: `Año ${i + 1}`, ing: Math.round(ing), eg: Math.round(eg), flujo: Math.round(ing - eg) };
     });
 
