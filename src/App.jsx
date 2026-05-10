@@ -131,26 +131,30 @@ function MesRow({ data, onChange }) {
         {data.mes}{faseTag}
       </td>
       <td style={{ padding: "4px 8px", width: 160 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ flex: 1, height: 3, background: C.border, borderRadius: 2, position: "relative" }}>
-            <div style={{ position: "absolute", left: 0, width: `${data.ocup}%`, height: "100%", background: data.ocup >= 70 ? C.green : data.ocup >= 55 ? C.amber : C.red, borderRadius: 2 }} />
-            <input type="range" min={20} max={95} step={1} value={data.ocup}
-              onChange={(e) => onChange({ ...data, ocup: Number(e.target.value) })}
-              style={{ position: "absolute", top: "50%", left: 0, width: "100%", height: 16, transform: "translateY(-50%)", opacity: 0, cursor: "pointer", margin: 0 }} />
+        {data.fase === "activo" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ flex: 1, height: 3, background: C.border, borderRadius: 2, position: "relative" }}>
+              <div style={{ position: "absolute", left: 0, width: `${data.ocup}%`, height: "100%", background: data.ocup >= 70 ? C.green : data.ocup >= 55 ? C.amber : C.red, borderRadius: 2 }} />
+              <input type="range" min={20} max={95} step={1} value={data.ocup}
+                onChange={(e) => onChange({ ...data, ocup: Number(e.target.value) })}
+                style={{ position: "absolute", top: "50%", left: 0, width: "100%", height: 16, transform: "translateY(-50%)", opacity: 0, cursor: "pointer", margin: 0 }} />
+            </div>
+            <span style={{ fontSize: 12, color: C.text, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{data.ocup}%</span>
           </div>
-          <span style={{ fontSize: 12, color: C.text, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{data.ocup}%</span>
-        </div>
+        ) : <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>—</span>}
       </td>
       <td style={{ padding: "4px 8px", width: 160 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ flex: 1, height: 3, background: C.border, borderRadius: 2, position: "relative" }}>
-            <div style={{ position: "absolute", left: 0, width: `${((data.tarifa - 100000) / 250000) * 100}%`, height: "100%", background: C.accent, borderRadius: 2 }} />
-            <input type="range" min={100000} max={350000} step={5000} value={data.tarifa}
-              onChange={(e) => onChange({ ...data, tarifa: Number(e.target.value) })}
-              style={{ position: "absolute", top: "50%", left: 0, width: "100%", height: 16, transform: "translateY(-50%)", opacity: 0, cursor: "pointer", margin: 0 }} />
+        {data.fase === "activo" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ flex: 1, height: 3, background: C.border, borderRadius: 2, position: "relative" }}>
+              <div style={{ position: "absolute", left: 0, width: `${((data.tarifa - 100000) / 250000) * 100}%`, height: "100%", background: C.accent, borderRadius: 2 }} />
+              <input type="range" min={100000} max={350000} step={5000} value={data.tarifa}
+                onChange={(e) => onChange({ ...data, tarifa: Number(e.target.value) })}
+                style={{ position: "absolute", top: "50%", left: 0, width: "100%", height: 16, transform: "translateY(-50%)", opacity: 0, cursor: "pointer", margin: 0 }} />
+            </div>
+            <span style={{ fontSize: 11, color: C.text, minWidth: 58, fontVariantNumeric: "tabular-nums" }}>{fmt(data.tarifa)}</span>
           </div>
-          <span style={{ fontSize: 11, color: C.text, minWidth: 58, fontVariantNumeric: "tabular-nums" }}>{fmt(data.tarifa)}</span>
-        </div>
+        ) : <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>—</span>}
       </td>
       <td style={{ padding: "8px 10px", fontSize: 11, color: C.textDim, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{data.fase === "activo" ? `${noches} noches` : "—"}</td>
       <td style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600, color: ingreso > 2_500_000 ? C.green : C.amber, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{data.fase === "activo" ? fmtM(ingreso) : "—"}</td>
