@@ -237,7 +237,6 @@ export default function App() {
     });
 
     // Break-even: tarifa que hace flujoAnual = 0
-    // egAnual_fijo = hipoteca × meses_con_hipoteca + egFijos × meses_activos
     const mesesConHipoteca = Math.max(0, 13 - mesEntrega);
     const egAnualFijo      = hipoteca * mesesConHipoteca + egFijos * mesesActivos.length;
     const nochesAnuales    = mensual.reduce((a, m) => a + m.noches, 0);
@@ -245,7 +244,25 @@ export default function App() {
       ? Math.ceil(egAnualFijo / (nochesAnuales * (1 - comisionPct / 100)))
       : 0;
 
-    return { mensual, ingAnual, egAnual, flujoAnual, ocupProm, tarifaProm, roi, proyeccion, tarifaMin, egFijos };
+    // Flujo acumulado 60 meses — detecta punto de equilibrio
+    let cumAcum = 0;
+    let breakEvenIdx = -1;
+    const acumulado60 = Array.from({ length: 60 }, (_, idx) => {
+      const year = Math.floor(idx / 12);
+      const mes  = idx % 12;
+      const flujoMes = year === 0
+        ? mensual[mes].flujo
+        : Math.round(proyeccion[year].flujo / 12);
+      cumAcum += flujoMes;
+      if (breakEvenIdx === -1 && cumAcum >= 0) breakEvenIdx = idx;
+      const label = mes === 0 ? `Año ${year + 1}` : (mes === 6 ? MESES_DEFAULT[mes].mes : "");
+      return { idx, label, flujoMes, acumulado: cumAcum };
+    });
+    const breakEvenLabel = breakEvenIdx === -1
+      ? "No alcanza en 5 años"
+      : `${MESES_DEFAULT[breakEvenIdx % 12].mes} · Año ${Math.floor(breakEvenIdx / 12) + 1} (mes ${breakEvenIdx + 1})`;
+
+    return { mensual, ingAnual, egAnual, flujoAnual, ocupProm, tarifaProm, roi, proyeccion, tarifaMin, egFijos, acumulado60, breakEvenIdx, breakEvenLabel };
   }, [hipoteca, admin, servicios, internet, limpieza, amenities, comisionPct, mantenimiento, meses, mesEntrega, mesArriendo]);
 
   const updateMes = (i, val) => setMeses((prev) => prev.map((m, j) => (j === i ? val : m)));
@@ -477,6 +494,40 @@ export default function App() {
                 </span>
               ))}
             </div>
+          </div>
+
+          {/* Flujo acumulado — punto de equilibrio */}
+          <div style={{ background: C.surface, border: `1px solid ${calc.breakEvenIdx >= 0 ? C.teal : C.border}`, borderRadius: 12, padding: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <div style={{ fontSize: 12, color: C.muted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Flujo acumulado — punto de equilibrio</div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Equilibrio</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: calc.breakEvenIdx >= 0 ? C.teal : C.red, fontVariantNumeric: "tabular-nums" }}>{calc.breakEvenLabel}</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 16 }}>Suma acumulada de flujos mensuales · año 1 real, años 2–5 con inflación 7%/5%</div>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={calc.acumulado60} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} interval={0} />
+                <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={44} />
+                <Tooltip
+                  contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }}
+                  formatter={(v, name) => [fmt(v), name === "acumulado" ? "Acumulado" : "Flujo mes"]}
+                  labelFormatter={(_, payload) => {
+                    if (!payload || !payload[0]) return "";
+                    const d = payload[0].payload;
+                    return `Mes ${d.idx + 1} · ${MESES_DEFAULT[d.idx % 12].mes} Año ${Math.floor(d.idx / 12) + 1}`;
+                  }}
+                  labelStyle={{ color: C.text, fontWeight: 600 }}
+                />
+                <ReferenceLine y={0} stroke={C.teal} strokeDasharray="4 2" strokeWidth={1.5} label={{ value: "Equilibrio", position: "insideTopLeft", fill: C.teal, fontSize: 10 }} />
+                {calc.breakEvenIdx >= 0 && (
+                  <ReferenceLine x={calc.acumulado60[calc.breakEvenIdx].label} stroke={C.teal} strokeDasharray="4 2" strokeWidth={1} />
+                )}
+                <Line type="monotone" dataKey="acumulado" stroke={C.accent} strokeWidth={2.5} dot={false} name="acumulado" />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
 
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
