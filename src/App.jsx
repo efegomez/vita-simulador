@@ -293,14 +293,14 @@ export default function App() {
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
               <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, letterSpacing: "0.06em", textTransform: "uppercase" }}>Flujo neto mensual</div>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={calc.mensual} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                <BarChart data={calc.mensual.slice(mesInicio - 1)} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
                   <XAxis dataKey="mes" tick={{ fontSize: 11, fill: C.muted }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={40} />
                   <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} formatter={(v, n) => [fmt(v), n === "flujo" ? "Flujo neto" : n]} labelStyle={{ color: C.text, fontWeight: 600 }} />
                   <ReferenceLine y={0} stroke={C.border} strokeWidth={1} />
                   <Bar dataKey="flujo" radius={[4, 4, 0, 0]} fill={C.green} label={false}
-                    cells={calc.mensual.map((m, i) => (
+                    cells={calc.mensual.slice(mesInicio - 1).map((m, i) => (
                       <cell key={i} fill={m.flujo >= 0 ? C.green : C.red} />
                     ))}
                   />
@@ -311,7 +311,7 @@ export default function App() {
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
               <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, letterSpacing: "0.06em", textTransform: "uppercase" }}>Ingresos vs egresos por mes</div>
               <ResponsiveContainer width="100%" height={180}>
-                <LineChart data={calc.mensual} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                <LineChart data={calc.mensual.slice(mesInicio - 1)} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
                   <XAxis dataKey="mes" tick={{ fontSize: 11, fill: C.muted }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={40} />
@@ -349,7 +349,7 @@ export default function App() {
             </thead>
             <tbody>
               {meses.map((m, i) => (
-                <MesRow key={m.mes} data={m} onChange={(v) => updateMes(i, v)} />
+                <MesRow key={m.mes} data={{ ...m, activo: calc.mensual[i].activo }} onChange={(v) => updateMes(i, v)} />
               ))}
             </tbody>
             <tfoot>
