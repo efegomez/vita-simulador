@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Brush } from "recharts";
 
 // ─── PALETA Y ESTILOS ────────────────────────────────────────────────────────
 const C = {
@@ -294,7 +294,22 @@ export default function App() {
       ? "No alcanza en 5 años"
       : `${MESES_DEFAULT[breakEvenIdx % 12].mes} · Año ${Math.floor(breakEvenIdx / 12) + 1} (mes ${breakEvenIdx + 1})`;
 
-    return { mensual, ingAnual, egAnual, flujoAnual, ocupProm, tarifaProm, roi, proyeccion, tarifaMin, egFijos, acumulado60, breakEvenIdx, breakEvenLabel };
+    // 36 meses desde entrega: Y1 real + Y2/Y3 proyectados (para charts con scroll)
+    const chart36 = Array.from({ length: 36 }, (_, i) => {
+      const mesIdx = (mesEntrega - 1 + i) % 12;
+      const year   = Math.floor((mesEntrega - 1 + i) / 12);
+      const base   = mensual[mesIdx];
+      if (year === 0) return { ...base, label: base.mes };
+      const factorIng = Math.pow(1.07, year);
+      const factorEg  = Math.pow(1.05, year);
+      const noches    = Math.round((base.ocup / 100) * 30);
+      const ingBruto  = Math.round(noches * base.tarifa * factorIng);
+      const comision2 = Math.round(ingBruto * (comisionPct / 100));
+      const egTotal2  = Math.round((hipoteca + egFijos) * factorEg + comision2);
+      return { ...base, noches, ingBruto, comision: comision2, egTotal: egTotal2, flujo: ingBruto - egTotal2, fase: "activo", label: `${base.mes} A${year + 1}` };
+    });
+
+    return { mensual, ingAnual, egAnual, flujoAnual, ocupProm, tarifaProm, roi, proyeccion, tarifaMin, egFijos, acumulado60, breakEvenIdx, breakEvenLabel, chart36 };
   }, [hipoteca, admin, servicios, internet, limpieza, amenities, comisionPct, mantenimiento, meses, mesEntrega, mesArriendo]);
 
   const updateMes = (i, val) => setMeses((prev) => prev.map((m, j) => (j === i ? val : m)));
@@ -331,9 +346,6 @@ export default function App() {
 
     return { ...conAbonos, totalIntereses: totalInt, ahorroAbonos: totalIntSin - totalInt, totalAbonos, mesFin, mesSinAbonos, saldoAnual, intCapAnual };
   }, [saldoInicial, tasaEA, plazoMeses, abonos]);
-
-  // Chart data: desde la entrega (incluye fase soloHipoteca)
-  const chartData = calc.mensual.slice(mesEntrega - 1);
 
   // Resumen de fases para el panel
   const nPreentrega   = mesEntrega - 1;
@@ -466,18 +478,19 @@ export default function App() {
                 <span style={{ marginRight: 14 }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.green, marginRight: 4 }} />Flujo positivo</span>
                 <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.red, marginRight: 4 }} />Flujo negativo</span>
               </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={230}>
+                <BarChart data={calc.chart36} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
-                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: C.muted }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={40} />
                   <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} formatter={(v, n) => [fmt(v), n === "flujo" ? "Flujo neto" : n]} labelStyle={{ color: C.text, fontWeight: 600 }} />
                   <ReferenceLine y={0} stroke={C.border} strokeWidth={1} />
                   <Bar dataKey="flujo" radius={[4, 4, 0, 0]} fill={C.green} label={false}
-                    cells={chartData.map((m, i) => (
-                      <cell key={i} fill={m.fase === "soloHipoteca" ? C.amber : m.flujo >= 0 ? C.green : C.red} />
+                    cells={calc.chart36.map((m, i) => (
+                      <cell key={i} fill={m.fase === "preentrega" ? C.muted : m.fase === "soloHipoteca" ? C.amber : m.flujo >= 0 ? C.green : C.red} />
                     ))}
                   />
+                  <Brush dataKey="label" height={22} startIndex={0} endIndex={11} stroke={C.border} fill={C.surface} travellerWidth={7} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -485,14 +498,15 @@ export default function App() {
             {/* Gráfico ingresos vs egresos */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
               <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, letterSpacing: "0.06em", textTransform: "uppercase" }}>Ingresos vs egresos por mes</div>
-              <ResponsiveContainer width="100%" height={180}>
-                <LineChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={210}>
+                <LineChart data={calc.chart36} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
-                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: C.muted }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={40} />
                   <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} formatter={(v) => [fmt(v)]} labelStyle={{ color: C.text, fontWeight: 600 }} />
                   <Line type="monotone" dataKey="ingBruto" stroke={C.green} strokeWidth={2} dot={false} name="Ingresos" />
                   <Line type="monotone" dataKey="egTotal" stroke={C.red} strokeWidth={2} dot={false} strokeDasharray="4 2" name="Egresos" />
+                  <Brush dataKey="label" height={22} startIndex={0} endIndex={11} stroke={C.border} fill={C.surface} travellerWidth={7} />
                 </LineChart>
               </ResponsiveContainer>
               <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
