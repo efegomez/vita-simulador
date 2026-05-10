@@ -26,15 +26,15 @@ const MESES_DEFAULT = [
   { mes: "Ene", ocup: 55, tarifa: 160000 },
   { mes: "Feb", ocup: 60, tarifa: 165000 },
   { mes: "Mar", ocup: 65, tarifa: 170000 },
-  { mes: "Abr", ocup: 70, tarifa: 185000 }, // Semana Santa
+  { mes: "Abr", ocup: 70, tarifa: 185000 },
   { mes: "May", ocup: 55, tarifa: 155000 },
   { mes: "Jun", ocup: 58, tarifa: 160000 },
-  { mes: "Jul", ocup: 72, tarifa: 190000 }, // Vacaciones
-  { mes: "Ago", ocup: 70, tarifa: 185000 }, // Vacaciones
+  { mes: "Jul", ocup: 72, tarifa: 190000 },
+  { mes: "Ago", ocup: 70, tarifa: 185000 },
   { mes: "Sep", ocup: 55, tarifa: 155000 },
   { mes: "Oct", ocup: 58, tarifa: 160000 },
   { mes: "Nov", ocup: 60, tarifa: 165000 },
-  { mes: "Dic", ocup: 85, tarifa: 240000 }, // Feria de Cali
+  { mes: "Dic", ocup: 85, tarifa: 240000 },
 ];
 
 // ─── SLIDER ──────────────────────────────────────────────────────────────────
@@ -117,13 +117,18 @@ function Semaforo({ flujoAnual }) {
 
 // ─── FILA MES ────────────────────────────────────────────────────────────────
 function MesRow({ data, onChange }) {
-  const noches = Math.round((data.ocup / 100) * 30);
+  const noches  = Math.round((data.ocup / 100) * 30);
   const ingreso = noches * data.tarifa;
-  const rowStyle = { borderBottom: `1px solid ${C.border}`, opacity: data.activo === false ? 0.4 : 1 };
+  const opacity = data.fase === "preentrega" ? 0.25 : data.fase === "soloHipoteca" ? 0.5 : 1;
+  const faseTag = data.fase === "preentrega"
+    ? <span style={{ fontSize: 9, color: C.muted, marginLeft: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>sin costos</span>
+    : data.fase === "soloHipoteca"
+    ? <span style={{ fontSize: 9, color: C.amber, marginLeft: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>hipoteca</span>
+    : null;
   return (
-    <tr style={rowStyle}>
+    <tr style={{ borderBottom: `1px solid ${C.border}`, opacity }}>
       <td style={{ padding: "8px 10px", color: C.textDim, fontSize: 12, fontWeight: 600, width: 40 }}>
-        {data.mes}{data.activo === false && <span style={{ fontSize: 10, color: C.muted, marginLeft: 4 }}>–</span>}
+        {data.mes}{faseTag}
       </td>
       <td style={{ padding: "4px 8px", width: 160 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -147,9 +152,31 @@ function MesRow({ data, onChange }) {
           <span style={{ fontSize: 11, color: C.text, minWidth: 58, fontVariantNumeric: "tabular-nums" }}>{fmt(data.tarifa)}</span>
         </div>
       </td>
-      <td style={{ padding: "8px 10px", fontSize: 11, color: C.textDim, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{noches} noches</td>
-      <td style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600, color: ingreso > 2_500_000 ? C.green : C.amber, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtM(ingreso)}</td>
+      <td style={{ padding: "8px 10px", fontSize: 11, color: C.textDim, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{data.fase === "activo" ? `${noches} noches` : "—"}</td>
+      <td style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600, color: ingreso > 2_500_000 ? C.green : C.amber, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{data.fase === "activo" ? fmtM(ingreso) : "—"}</td>
     </tr>
+  );
+}
+
+// ─── SELECTOR DE MES ─────────────────────────────────────────────────────────
+function MesSelect({ value, onChange, minValue = 1, label }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: C.textDim, marginBottom: 5 }}>{label}</div>
+      <select
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{
+          width: "100%", padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`,
+          background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: "pointer",
+          outline: "none", appearance: "none",
+        }}
+      >
+        {MESES_DEFAULT.map((m, i) => (
+          <option key={i} value={i + 1} disabled={i + 1 < minValue}>{m.mes} (mes {i + 1})</option>
+        ))}
+      </select>
+    </div>
   );
 }
 
@@ -164,28 +191,44 @@ export default function App() {
   const [comisionPct,   setComisionPct]   = useState(3);
   const [mantenimiento, setMantenimiento] = useState(100000);
   const [meses, setMeses]                 = useState(MESES_DEFAULT);
-  const [mesInicio, setMesInicio]         = useState(1);
+  const [mesEntrega,    setMesEntrega]    = useState(3);  // Marzo: hipoteca arranca
+  const [mesArriendo,   setMesArriendo]   = useState(8);  // Agosto: todo arranca + ingresos
   const [tab, setTab]                     = useState("simulador");
 
   const calc = useMemo(() => {
     const egFijos = admin + servicios + internet + limpieza + amenities + mantenimiento;
 
     const mensual = meses.map((m, i) => {
-      const activo   = i >= mesInicio - 1;
-      const noches   = activo ? Math.round((m.ocup / 100) * 30) : 0;
-      const ingBruto = noches * m.tarifa;
-      const comision = ingBruto * (comisionPct / 100);
-      const egTotal  = hipoteca + egFijos + (activo ? comision : 0);
-      const flujo    = ingBruto - egTotal;
-      return { ...m, noches, ingBruto, comision, egTotal, flujo, activo };
+      let fase, noches, ingBruto, comision, egTotal;
+      if (i < mesEntrega - 1) {
+        // Fase 0: antes de entrega — sin costos, sin ingresos
+        fase = "preentrega";
+        noches = 0; ingBruto = 0; comision = 0; egTotal = 0;
+      } else if (i < mesArriendo - 1) {
+        // Fase 1: entregado sin arrendar — solo hipoteca
+        fase = "soloHipoteca";
+        noches = 0; ingBruto = 0; comision = 0; egTotal = hipoteca;
+      } else {
+        // Fase 2: arriendo activo — todos los costos + ingresos
+        fase = "activo";
+        noches   = Math.round((m.ocup / 100) * 30);
+        ingBruto = noches * m.tarifa;
+        comision = ingBruto * (comisionPct / 100);
+        egTotal  = hipoteca + egFijos + comision;
+      }
+      return { ...m, noches, ingBruto, comision, egTotal, flujo: ingBruto - egTotal, fase };
     });
 
     const ingAnual   = mensual.reduce((a, m) => a + m.ingBruto, 0);
     const egAnual    = mensual.reduce((a, m) => a + m.egTotal,  0);
     const flujoAnual = ingAnual - egAnual;
-    const ocupProm   = Math.round(meses.reduce((a, m) => a + m.ocup, 0) / 12);
-    const tarifaProm = Math.round(meses.reduce((a, m) => a + m.tarifa, 0) / 12);
-    const roi        = (flujoAnual / 420_000_000) * 100;
+
+    const mesesActivos  = mensual.filter(m => m.fase === "activo");
+    const ocupProm      = mesesActivos.length > 0
+      ? Math.round(mesesActivos.reduce((a, m) => a + m.ocup, 0) / mesesActivos.length) : 0;
+    const tarifaProm    = mesesActivos.length > 0
+      ? Math.round(mesesActivos.reduce((a, m) => a + m.tarifa, 0) / mesesActivos.length) : 0;
+    const roi           = (flujoAnual / 420_000_000) * 100;
 
     const proyeccion = Array.from({ length: 5 }, (_, i) => {
       const ing = ingAnual * Math.pow(1.07, i);
@@ -193,16 +236,27 @@ export default function App() {
       return { año: `Año ${i + 1}`, ing: Math.round(ing), eg: Math.round(eg), flujo: Math.round(ing - eg) };
     });
 
-    const egFijosMensuales = hipoteca + egFijos;
+    // Break-even: tarifa que hace flujoAnual = 0
+    // egAnual_fijo = hipoteca × meses_con_hipoteca + egFijos × meses_activos
+    const mesesConHipoteca = Math.max(0, 13 - mesEntrega);
+    const egAnualFijo      = hipoteca * mesesConHipoteca + egFijos * mesesActivos.length;
     const nochesAnuales    = mensual.reduce((a, m) => a + m.noches, 0);
     const tarifaMin        = nochesAnuales > 0
-      ? Math.ceil((egFijosMensuales * 12) / (nochesAnuales * (1 - comisionPct / 100)))
+      ? Math.ceil(egAnualFijo / (nochesAnuales * (1 - comisionPct / 100)))
       : 0;
 
     return { mensual, ingAnual, egAnual, flujoAnual, ocupProm, tarifaProm, roi, proyeccion, tarifaMin, egFijos };
-  }, [hipoteca, admin, servicios, internet, limpieza, amenities, comisionPct, mantenimiento, meses]);
+  }, [hipoteca, admin, servicios, internet, limpieza, amenities, comisionPct, mantenimiento, meses, mesEntrega, mesArriendo]);
 
   const updateMes = (i, val) => setMeses((prev) => prev.map((m, j) => (j === i ? val : m)));
+
+  // Chart data: desde la entrega (incluye fase soloHipoteca)
+  const chartData = calc.mensual.slice(mesEntrega - 1);
+
+  // Resumen de fases para el panel
+  const nPreentrega   = mesEntrega - 1;
+  const nSoloHipoteca = Math.max(0, mesArriendo - mesEntrega);
+  const nActivo       = Math.max(0, 13 - mesArriendo);
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "'DM Sans', 'Segoe UI', sans-serif", padding: "24px 20px" }}>
@@ -235,6 +289,8 @@ export default function App() {
       {tab === "simulador" && (
         <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16, alignItems: "start" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+            {/* Egresos */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
               <div style={{ fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>Egresos mensuales</div>
               <Slider label="Cuota hipoteca (Davivienda)" value={hipoteca} min={1200000} max={2500000} step={10000} format={fmt} onChange={setHipoteca} color={C.red} />
@@ -246,72 +302,95 @@ export default function App() {
               <Slider label="Mantenimiento / imprevistos" value={mantenimiento} min={50000} max={300000} step={10000} format={fmt} onChange={setMantenimiento} />
               <Slider label="Comisión Airbnb (%)" value={comisionPct} min={1} max={15} step={0.5} format={(v) => `${v}%`} onChange={setComisionPct} color={C.amber} />
               <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 8, paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 12, color: C.muted }}>Total egresos fijos/mes</span>
+                <span style={{ fontSize: 12, color: C.muted }}>Total egresos fijos/mes (activo)</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: C.red, fontVariantNumeric: "tabular-nums" }}>{fmt(hipoteca + calc.egFijos)}</span>
               </div>
             </div>
 
-            {/* Mes de inicio */}
+            {/* Fases del apartamento */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Inicio de productividad</div>
-              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 8 }}>Meses previos: egresos sin ingresos</div>
-              <select
-                value={mesInicio}
-                onChange={(e) => setMesInicio(Number(e.target.value))}
-                style={{
-                  width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`,
-                  background: C.card, color: C.text, fontSize: 14, fontWeight: 600, cursor: "pointer",
-                  outline: "none", appearance: "none",
-                }}
-              >
-                {MESES_DEFAULT.map((m, i) => (
-                  <option key={i} value={i + 1}>{m.mes} (mes {i + 1})</option>
-                ))}
-              </select>
-              {mesInicio > 1 && (
-                <div style={{ marginTop: 8, fontSize: 11, color: C.amber }}>
-                  {mesInicio - 1} mes{mesInicio > 2 ? "es" : ""} sin ingresos · pérdida estimada: {fmtM((hipoteca + calc.egFijos) * (mesInicio - 1))}
-                </div>
-              )}
+              <div style={{ fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>Fases del apartamento</div>
+              <MesSelect label="Mes de entrega (hipoteca arranca)" value={mesEntrega} onChange={(v) => { setMesEntrega(v); if (mesArriendo < v) setMesArriendo(v); }} />
+              <MesSelect label="Mes de inicio arriendo (todos los gastos + ingresos)" value={mesArriendo} onChange={setMesArriendo} minValue={mesEntrega} />
+
+              {/* Resumen visual de fases */}
+              <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 4, paddingTop: 12, display: "flex", flexDirection: "column", gap: 7 }}>
+                {nPreentrega > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                    <span style={{ color: C.muted }}>
+                      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.muted, marginRight: 6 }} />
+                      {MESES_DEFAULT[0].mes}–{MESES_DEFAULT[nPreentrega - 1].mes} · sin costos
+                    </span>
+                    <span style={{ color: C.muted }}>{nPreentrega} mes{nPreentrega > 1 ? "es" : ""}</span>
+                  </div>
+                )}
+                {nSoloHipoteca > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                    <span style={{ color: C.amber }}>
+                      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.amber, marginRight: 6 }} />
+                      {MESES_DEFAULT[mesEntrega - 1].mes}–{MESES_DEFAULT[mesArriendo - 2].mes} · solo hipoteca
+                    </span>
+                    <span style={{ color: C.amber, fontVariantNumeric: "tabular-nums" }}>{fmtM(hipoteca * nSoloHipoteca)}</span>
+                  </div>
+                )}
+                {nActivo > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                    <span style={{ color: C.green }}>
+                      <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.green, marginRight: 6 }} />
+                      {MESES_DEFAULT[mesArriendo - 1].mes}–Dic · arriendo activo
+                    </span>
+                    <span style={{ color: C.green }}>{nActivo} mes{nActivo > 1 ? "es" : ""}</span>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Punto de equilibrio */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
               <div style={{ fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Punto de equilibrio</div>
-              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 6 }}>Tarifa mínima para cubrir todos los costos:</div>
+              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 6 }}>Tarifa mínima para cubrir todos los costos del año:</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: C.amber, fontVariantNumeric: "tabular-nums" }}>{fmt(calc.tarifaMin)}</div>
-              <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>por noche · con la ocupación actual promedio ({calc.ocupProm}%)</div>
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>por noche · ocupación promedio {calc.ocupProm}% · {nActivo} meses activos</div>
             </div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
               <MetricCard label="Ingreso bruto anual" value={fmtM(calc.ingAnual)} sub={`Prom. ${fmt(calc.tarifaProm)}/noche`} color={C.green} />
-              <MetricCard label="Egresos totales anuales" value={fmtM(calc.egAnual)} sub="Fijos + variables" color={C.red} />
+              <MetricCard label="Egresos totales anuales" value={fmtM(calc.egAnual)} sub="Todas las fases" color={C.red} />
               <MetricCard label="Flujo neto anual" value={fmtM(calc.flujoAnual)} sub={calc.flujoAnual >= 0 ? "Positivo" : "Déficit"} color={calc.flujoAnual >= 0 ? C.green : C.red} highlight={true} />
               <MetricCard label="ROI sobre precio" value={`${calc.roi.toFixed(2)}%`} sub="Anual sobre $420M" color={C.accent} />
             </div>
 
+            {/* Gráfico flujo neto mensual */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, letterSpacing: "0.06em", textTransform: "uppercase" }}>Flujo neto mensual</div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>Flujo neto mensual</div>
+              <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>
+                <span style={{ marginRight: 14 }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.amber, marginRight: 4 }} />Solo hipoteca</span>
+                <span style={{ marginRight: 14 }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.green, marginRight: 4 }} />Flujo positivo</span>
+                <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.red, marginRight: 4 }} />Flujo negativo</span>
+              </div>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={calc.mensual.slice(mesInicio - 1)} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                <BarChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
                   <XAxis dataKey="mes" tick={{ fontSize: 11, fill: C.muted }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={40} />
                   <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} formatter={(v, n) => [fmt(v), n === "flujo" ? "Flujo neto" : n]} labelStyle={{ color: C.text, fontWeight: 600 }} />
                   <ReferenceLine y={0} stroke={C.border} strokeWidth={1} />
                   <Bar dataKey="flujo" radius={[4, 4, 0, 0]} fill={C.green} label={false}
-                    cells={calc.mensual.slice(mesInicio - 1).map((m, i) => (
-                      <cell key={i} fill={m.flujo >= 0 ? C.green : C.red} />
+                    cells={chartData.map((m, i) => (
+                      <cell key={i} fill={m.fase === "soloHipoteca" ? C.amber : m.flujo >= 0 ? C.green : C.red} />
                     ))}
                   />
                 </BarChart>
               </ResponsiveContainer>
             </div>
 
+            {/* Gráfico ingresos vs egresos */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
               <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, letterSpacing: "0.06em", textTransform: "uppercase" }}>Ingresos vs egresos por mes</div>
               <ResponsiveContainer width="100%" height={180}>
-                <LineChart data={calc.mensual.slice(mesInicio - 1)} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                <LineChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
                   <XAxis dataKey="mes" tick={{ fontSize: 11, fill: C.muted }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={40} />
@@ -349,7 +428,7 @@ export default function App() {
             </thead>
             <tbody>
               {meses.map((m, i) => (
-                <MesRow key={m.mes} data={{ ...m, activo: calc.mensual[i].activo }} onChange={(v) => updateMes(i, v)} />
+                <MesRow key={m.mes} data={{ ...m, fase: calc.mensual[i].fase }} onChange={(v) => updateMes(i, v)} />
               ))}
             </tbody>
             <tfoot>
