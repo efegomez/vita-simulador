@@ -208,6 +208,8 @@ export default function App() {
   const [comisionPct,   setComisionPct]   = useState(3);
   const [mantenimiento, setMantenimiento] = useState(100000);
   const [meses, setMeses]                 = useState(MESES_DEFAULT);
+  const [tarifaBase,    setTarifaBase]    = useState(170000);
+  const [ocupGlobal,    setOcupGlobal]    = useState(63);
   const [mesEntrega,    setMesEntrega]    = useState(3);
   const [mesArriendo,   setMesArriendo]   = useState(8);
   const [tasaEA,        setTasaEA]        = useState(7);
@@ -361,6 +363,20 @@ export default function App() {
       {tab === "simulador" && (
         <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16, alignItems: "start" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+            {/* Ingresos */}
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
+              <div style={{ fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>Ingresos — arriendo</div>
+              <Slider label="Tarifa base por noche" value={tarifaBase} min={50000} max={500000} step={5000} format={fmt}
+                onChange={(v) => { setTarifaBase(v); setMeses(prev => prev.map(m => ({ ...m, tarifa: v }))); }}
+                color={C.green} />
+              <Slider label="Ocupación global (%)" value={ocupGlobal} min={20} max={95} step={1} format={(v) => `${v}%`}
+                onChange={(v) => { setOcupGlobal(v); setMeses(prev => prev.map(m => ({ ...m, ocup: v }))); }}
+                color={C.teal} />
+              <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 4, paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 11, color: C.muted }}>Ajuste fino por mes → tab "Por mes"</span>
+              </div>
+            </div>
 
             {/* Egresos */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
