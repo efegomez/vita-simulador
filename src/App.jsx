@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Brush, Cell } from "recharts";
+import { LineChart, Line, ComposedChart, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Brush, Cell } from "recharts";
 
 // ─── PALETA Y ESTILOS ────────────────────────────────────────────────────────
 const C = {
@@ -296,18 +296,24 @@ export default function App() {
       : `${MESES_DEFAULT[breakEvenIdx % 12].mes} · Año ${Math.floor(breakEvenIdx / 12) + 1} (mes ${breakEvenIdx + 1})`;
 
     // 36 meses desde entrega: Y1 real + Y2/Y3 proyectados (para charts con scroll)
+    let _acum = 0;
     const chart36 = Array.from({ length: 36 }, (_, i) => {
       const mesIdx = (mesEntrega - 1 + i) % 12;
       const year   = Math.floor((mesEntrega - 1 + i) / 12);
       const base   = mensual[mesIdx];
-      if (year === 0) return { ...base, label: base.mes };
-      const factorIng = Math.pow(1.07, year);
-      const factorEg  = Math.pow(1.05, year);
-      const noches    = Math.round((base.ocup / 100) * 30);
-      const ingBruto  = Math.round(noches * base.tarifa * factorIng);
-      const comision2 = Math.round(ingBruto * (comisionPct / 100));
-      const egTotal2  = Math.round((hipoteca + egFijos) * factorEg + comision2);
-      return { ...base, noches, ingBruto, comision: comision2, egTotal: egTotal2, flujo: ingBruto - egTotal2, fase: "activo", label: `${base.mes} A${year + 1}` };
+      let p;
+      if (year === 0) {
+        p = { ...base, label: base.mes };
+      } else {
+        const fi = Math.pow(1.07, year), fe = Math.pow(1.05, year);
+        const n  = Math.round((base.ocup / 100) * 30);
+        const ib = Math.round(n * base.tarifa * fi);
+        const c2 = Math.round(ib * (comisionPct / 100));
+        const et = Math.round((hipoteca + egFijos) * fe + c2);
+        p = { ...base, noches: n, ingBruto: ib, comision: c2, egTotal: et, flujo: ib - et, fase: "activo", label: `${base.mes} A${year + 1}` };
+      }
+      _acum += p.flujo;
+      return { ...p, flujoAcum: _acum };
     });
 
     return { mensual, ingAnual, egAnual, flujoAnual, ocupProm, tarifaProm, roi, proyeccion, tarifaMin, egFijos, acumulado60, breakEvenIdx, breakEvenLabel, chart36 };
@@ -480,19 +486,22 @@ export default function App() {
                 <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.red, marginRight: 4 }} />Flujo negativo</span>
               </div>
               <ResponsiveContainer width="100%" height={230}>
-                <BarChart data={calc.chart36} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+                <ComposedChart data={calc.chart36} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={40} />
-                  <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} formatter={(v, n) => [fmt(v), n === "flujo" ? "Flujo neto" : n]} labelStyle={{ color: C.text, fontWeight: 600 }} />
+                  <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }}
+                    formatter={(v, n) => [fmt(v), n === "flujo" ? "Flujo mensual" : "Acumulado"]}
+                    labelStyle={{ color: C.text, fontWeight: 600 }} />
                   <ReferenceLine y={0} stroke={C.border} strokeWidth={1} />
                   <Bar dataKey="flujo" radius={[4, 4, 0, 0]} label={false}>
                     {calc.chart36.map((m, i) => (
                       <Cell key={i} fill={m.fase === "preentrega" ? C.muted : m.fase === "soloHipoteca" ? C.amber : m.flujo >= 0 ? C.green : C.red} />
                     ))}
                   </Bar>
+                  <Line type="monotone" dataKey="flujoAcum" stroke={C.teal} strokeWidth={2} dot={false} name="flujoAcum" />
                   <Brush dataKey="label" height={22} startIndex={0} endIndex={11} stroke={C.border} fill={C.surface} travellerWidth={7} />
-                </BarChart>
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
 
