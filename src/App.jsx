@@ -218,6 +218,8 @@ export default function App() {
   const [abonos,        setAbonos]        = useState([]);
   const [verTodaTabla,  setVerTodaTabla]  = useState(false);
   const [horizonte,     setHorizonte]     = useState(5);
+  const [brush1, setBrush1] = useState({ startIndex: 0, endIndex: 11 });
+  const [brush2, setBrush2] = useState({ startIndex: 0, endIndex: 11 });
   const [tab, setTab]                     = useState("simulador");
 
   const calc = useMemo(() => {
@@ -497,7 +499,7 @@ export default function App() {
                   <Bar dataKey="ingBruto" name="ingBruto" fill={`${C.green}88`} stroke={C.green} strokeWidth={1} radius={[3, 3, 0, 0]} />
                   <Bar dataKey="egNeg"    name="egNeg"    fill={`${C.red}88`}   stroke={C.red}   strokeWidth={1} radius={[0, 0, 3, 3]} />
                   <Line type="monotone" dataKey="flujo" stroke={C.teal} strokeWidth={2} dot={false} name="flujo" />
-                  <Brush dataKey="label" height={22} startIndex={0} endIndex={11} stroke={C.border} fill={C.surface} travellerWidth={7} />
+                  <Brush dataKey="label" height={22} startIndex={brush1.startIndex} endIndex={brush1.endIndex} onChange={setBrush1} stroke={C.border} fill={C.surface} travellerWidth={7} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -513,7 +515,7 @@ export default function App() {
                   <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} formatter={(v) => [fmt(v)]} labelStyle={{ color: C.text, fontWeight: 600 }} />
                   <Line type="monotone" dataKey="ingBruto" stroke={C.green} strokeWidth={2} dot={false} name="Ingresos" />
                   <Line type="monotone" dataKey="egTotal" stroke={C.red} strokeWidth={2} dot={false} strokeDasharray="4 2" name="Egresos" />
-                  <Brush dataKey="label" height={22} startIndex={0} endIndex={11} stroke={C.border} fill={C.surface} travellerWidth={7} />
+                  <Brush dataKey="label" height={22} startIndex={brush2.startIndex} endIndex={brush2.endIndex} onChange={setBrush2} stroke={C.border} fill={C.surface} travellerWidth={7} />
                 </LineChart>
               </ResponsiveContainer>
               <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
