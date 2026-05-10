@@ -226,7 +226,7 @@ export default function App() {
   const [brush2, setBrush2] = useState({ startIndex: 0, endIndex: 11 });
   const [tab, setTab]                     = useState("simulador");
 
-  const calc = useMemo(() => {
+  const calc = (() => {
     const egFijos = admin + servicios + internet + limpieza + amenities + mantenimiento;
 
     const mensual = meses.map((m, i) => {
@@ -323,7 +323,7 @@ export default function App() {
     });
 
     return { mensual, ingAnual, egAnual, flujoAnual, ocupProm, tarifaProm, roi, proyeccion, tarifaMin, egFijos, acumulado60, breakEvenIdx, breakEvenLabel, chart36 };
-  }, [hipoteca, admin, servicios, internet, limpieza, amenities, comisionPct, mantenimiento, meses, mesEntrega, mesArriendo, horizonte]);
+  })();
 
   const updateMes = (i, val) => setMeses((prev) => prev.map((m, j) => (j === i ? val : m)));
 
