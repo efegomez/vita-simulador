@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Brush } from "recharts";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Brush, Cell } from "recharts";
 
 // ─── PALETA Y ESTILOS ────────────────────────────────────────────────────────
 const C = {
@@ -485,11 +485,11 @@ export default function App() {
                   <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={40} />
                   <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} formatter={(v, n) => [fmt(v), n === "flujo" ? "Flujo neto" : n]} labelStyle={{ color: C.text, fontWeight: 600 }} />
                   <ReferenceLine y={0} stroke={C.border} strokeWidth={1} />
-                  <Bar dataKey="flujo" radius={[4, 4, 0, 0]} fill={C.green} label={false}
-                    cells={calc.chart36.map((m, i) => (
-                      <cell key={i} fill={m.fase === "preentrega" ? C.muted : m.fase === "soloHipoteca" ? C.amber : m.flujo >= 0 ? C.green : C.red} />
+                  <Bar dataKey="flujo" radius={[4, 4, 0, 0]} label={false}>
+                    {calc.chart36.map((m, i) => (
+                      <Cell key={i} fill={m.fase === "preentrega" ? C.muted : m.fase === "soloHipoteca" ? C.amber : m.flujo >= 0 ? C.green : C.red} />
                     ))}
-                  />
+                  </Bar>
                   <Brush dataKey="label" height={22} startIndex={0} endIndex={11} stroke={C.border} fill={C.surface} travellerWidth={7} />
                 </BarChart>
               </ResponsiveContainer>
