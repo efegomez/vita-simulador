@@ -313,7 +313,7 @@ export default function App() {
         p = { ...base, noches: n, ingBruto: ib, comision: c2, egTotal: et, flujo: ib - et, fase: "activo", label: `${base.mes} A${year + 1}` };
       }
       _acum += p.flujo;
-      return { ...p, flujoAcum: _acum };
+      return { ...p, flujoAcum: _acum, egNeg: -p.egTotal };
     });
 
     return { mensual, ingAnual, egAnual, flujoAnual, ocupProm, tarifaProm, roi, proyeccion, tarifaMin, egFijos, acumulado60, breakEvenIdx, breakEvenLabel, chart36 };
@@ -491,11 +491,11 @@ export default function App() {
                   <XAxis dataKey="label" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={40} />
                   <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }}
-                    formatter={(v, n) => [fmt(v), n === "ingBruto" ? "Ingresos" : n === "egTotal" ? "Egresos" : "Flujo neto"]}
+                    formatter={(v, n) => [fmt(Math.abs(v)), n === "ingBruto" ? "Ingresos" : n === "egNeg" ? "Egresos" : "Flujo neto"]}
                     labelStyle={{ color: C.text, fontWeight: 600 }} />
                   <ReferenceLine y={0} stroke={C.border} strokeWidth={1} />
                   <Bar dataKey="ingBruto" name="ingBruto" fill={`${C.green}88`} stroke={C.green} strokeWidth={1} radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="egTotal"  name="egTotal"  fill={`${C.red}88`}   stroke={C.red}   strokeWidth={1} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="egNeg"    name="egNeg"    fill={`${C.red}88`}   stroke={C.red}   strokeWidth={1} radius={[0, 0, 3, 3]} />
                   <Line type="monotone" dataKey="flujo" stroke={C.teal} strokeWidth={2} dot={false} name="flujo" />
                   <Brush dataKey="label" height={22} startIndex={0} endIndex={11} stroke={C.border} fill={C.surface} travellerWidth={7} />
                 </ComposedChart>
