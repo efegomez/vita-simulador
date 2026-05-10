@@ -217,6 +217,7 @@ export default function App() {
   const [saldoInicial,  setSaldoInicial]  = useState(214001346);
   const [abonos,        setAbonos]        = useState([]);
   const [verTodaTabla,  setVerTodaTabla]  = useState(false);
+  const [horizonte,     setHorizonte]     = useState(5);
   const [tab, setTab]                     = useState("simulador");
 
   const calc = useMemo(() => {
@@ -259,7 +260,7 @@ export default function App() {
     const baseIngFull   = ingMesActivo * 12;
     const baseEgFijosFull = (hipoteca + egFijos) * 12;
 
-    const proyeccion = Array.from({ length: 5 }, (_, i) => {
+    const proyeccion = Array.from({ length: horizonte }, (_, i) => {
       if (i === 0) return { año: "Año 1", ing: Math.round(ingAnual), eg: Math.round(egAnual), flujo: Math.round(ingAnual - egAnual) };
       const growth   = Math.pow(1.07, i - 1); // año 2 = base sin crecimiento, año 3 = ×1.07, etc.
       const ing      = baseIngFull * growth;
@@ -310,7 +311,7 @@ export default function App() {
     });
 
     return { mensual, ingAnual, egAnual, flujoAnual, ocupProm, tarifaProm, roi, proyeccion, tarifaMin, egFijos, acumulado60, breakEvenIdx, breakEvenLabel, chart36 };
-  }, [hipoteca, admin, servicios, internet, limpieza, amenities, comisionPct, mantenimiento, meses, mesEntrega, mesArriendo]);
+  }, [hipoteca, admin, servicios, internet, limpieza, amenities, comisionPct, mantenimiento, meses, mesEntrega, mesArriendo, horizonte]);
 
   const updateMes = (i, val) => setMeses((prev) => prev.map((m, j) => (j === i ? val : m)));
 
@@ -566,8 +567,17 @@ export default function App() {
       {tab === "proyeccion" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
-            <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>Proyección a 5 años</div>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 16 }}>Asume inflación de ingresos 7% anual y gastos 5% anual (estimado Colombia)</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: C.muted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Proyección a {horizonte} años</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 11, color: C.muted }}>Horizonte:</span>
+                <input type="range" min={2} max={20} step={1} value={horizonte}
+                  onChange={(e) => setHorizonte(Number(e.target.value))}
+                  style={{ width: 120, cursor: "pointer" }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.accent, minWidth: 24 }}>{horizonte}</span>
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 16 }}>Ingresos +7%/año · Gastos +5%/año (estimado Colombia)</div>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={calc.proyeccion} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
@@ -674,7 +684,7 @@ export default function App() {
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
                 <div style={{ fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>Parámetros del crédito</div>
                 <Slider label="Tasa efectiva anual (%)" value={tasaEA} min={5} max={20} step={0.1} format={(v) => `${v.toFixed(1)}%`} onChange={setTasaEA} color={C.amber} />
-                <Slider label="Plazo (meses)" value={plazoMeses} min={60} max={360} step={12} format={(v) => `${v} meses (${v/12} años)`} onChange={setPlazoMeses} />
+                <Slider label="Plazo del crédito" value={plazoMeses} min={60} max={360} step={12} format={(v) => `${v/12} años (${v} meses)`} onChange={setPlazoMeses} />
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontSize: 12, color: C.textDim }}>Saldo inicial</span>
