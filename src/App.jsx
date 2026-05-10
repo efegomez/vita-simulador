@@ -180,6 +180,23 @@ function MesSelect({ value, onChange, minValue = 1, label }) {
   );
 }
 
+// ─── AMORTIZACIÓN ────────────────────────────────────────────────────────────
+function computeAmortizacion(saldoInicial, tasaEA, plazoMeses, abonos) {
+  const r        = Math.pow(1 + tasaEA / 100, 1 / 12) - 1;
+  const cuota    = saldoInicial * r * Math.pow(1+r, plazoMeses) / (Math.pow(1+r, plazoMeses) - 1);
+  const abonosMap = Object.fromEntries(abonos.filter(a => a.mes > 0 && a.monto > 0).map(a => [a.mes, a.monto]));
+  const schedule = [];
+  let saldo = saldoInicial;
+  for (let mes = 1; mes <= plazoMeses && saldo > 0.5; mes++) {
+    const interes   = saldo * r;
+    const principal = Math.min(cuota - interes, saldo);
+    const abono     = Math.min(abonosMap[mes] || 0, Math.max(0, saldo - principal));
+    saldo          -= (principal + abono);
+    schedule.push({ mes, cuota: Math.round(cuota), interes: Math.round(interes), principal: Math.round(principal), abono: Math.round(abono), saldo: Math.max(0, Math.round(saldo)) });
+  }
+  return { schedule, cuota: Math.round(cuota), r };
+}
+
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
 export default function App() {
   const [hipoteca,      setHipoteca]      = useState(1800000);
@@ -191,8 +208,13 @@ export default function App() {
   const [comisionPct,   setComisionPct]   = useState(3);
   const [mantenimiento, setMantenimiento] = useState(100000);
   const [meses, setMeses]                 = useState(MESES_DEFAULT);
-  const [mesEntrega,    setMesEntrega]    = useState(3);  // Marzo: hipoteca arranca
-  const [mesArriendo,   setMesArriendo]   = useState(8);  // Agosto: todo arranca + ingresos
+  const [mesEntrega,    setMesEntrega]    = useState(3);
+  const [mesArriendo,   setMesArriendo]   = useState(8);
+  const [tasaEA,        setTasaEA]        = useState(7);
+  const [plazoMeses,    setPlazoMeses]    = useState(180);
+  const [saldoInicial,  setSaldoInicial]  = useState(214001346);
+  const [abonos,        setAbonos]        = useState([]);
+  const [verTodaTabla,  setVerTodaTabla]  = useState(false);
   const [tab, setTab]                     = useState("simulador");
 
   const calc = useMemo(() => {
@@ -267,6 +289,39 @@ export default function App() {
 
   const updateMes = (i, val) => setMeses((prev) => prev.map((m, j) => (j === i ? val : m)));
 
+  const amort = useMemo(() => {
+    const conAbonos    = computeAmortizacion(saldoInicial, tasaEA, plazoMeses, abonos);
+    const sinAbonos    = computeAmortizacion(saldoInicial, tasaEA, plazoMeses, []);
+    const totalInt     = conAbonos.schedule.reduce((a, r) => a + r.interes, 0);
+    const totalIntSin  = sinAbonos.schedule.reduce((a, r) => a + r.interes, 0);
+    const totalAbonos  = conAbonos.schedule.reduce((a, r) => a + r.abono, 0);
+    const mesFin       = conAbonos.schedule.length;
+    const mesSinAbonos = sinAbonos.schedule.length;
+
+    // Saldo por año para chart (cada 12 meses, con y sin abonos)
+    const saldoAnual = Array.from({ length: Math.ceil(sinAbonos.schedule.length / 12) }, (_, y) => {
+      const idx     = Math.min((y + 1) * 12 - 1, sinAbonos.schedule.length - 1);
+      const idxCon  = Math.min((y + 1) * 12 - 1, conAbonos.schedule.length - 1);
+      return {
+        año: `Año ${y + 1}`,
+        sinAbonos: sinAbonos.schedule[idx]?.saldo ?? 0,
+        conAbonos: idxCon < conAbonos.schedule.length ? conAbonos.schedule[idxCon].saldo : 0,
+      };
+    });
+
+    // Int vs capital por año
+    const intCapAnual = Array.from({ length: Math.ceil(conAbonos.schedule.length / 12) }, (_, y) => {
+      const slice = conAbonos.schedule.slice(y * 12, (y + 1) * 12);
+      return {
+        año: `A${y + 1}`,
+        interes:   slice.reduce((a, r) => a + r.interes, 0),
+        principal: slice.reduce((a, r) => a + r.principal + r.abono, 0),
+      };
+    });
+
+    return { ...conAbonos, totalIntereses: totalInt, ahorroAbonos: totalIntSin - totalInt, totalAbonos, mesFin, mesSinAbonos, saldoAnual, intCapAnual };
+  }, [saldoInicial, tasaEA, plazoMeses, abonos]);
+
   // Chart data: desde la entrega (incluye fase soloHipoteca)
   const chartData = calc.mensual.slice(mesEntrega - 1);
 
@@ -292,7 +347,7 @@ export default function App() {
 
       {/* TABS */}
       <div style={{ display: "flex", gap: 4, marginBottom: 20, background: C.surface, padding: 4, borderRadius: 10, width: "fit-content" }}>
-        {[["simulador", "Simulador"], ["mensual", "Por mes"], ["proyeccion", "Proyección 5 años"]].map(([key, label]) => (
+        {[["simulador", "Simulador"], ["mensual", "Por mes"], ["proyeccion", "Proyección 5 años"], ["deuda", "Deuda Davivienda"]].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)} style={{
             padding: "7px 18px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 500,
             background: tab === key ? C.accent : "transparent",
@@ -558,6 +613,169 @@ export default function App() {
 
           <div style={{ fontSize: 11, color: C.muted, padding: "0 4px" }}>
             * La hipoteca Davivienda se mantiene fija durante el período. Los ingresos crecen 7% anual (inflación + mejora de reputación en plataforma). Los gastos operativos crecen 5% anual.
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: DEUDA ── */}
+      {tab === "deuda" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+          {/* KPIs */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+            <MetricCard label="Cuota mensual" value={fmt(amort.cuota)} sub={`Tasa ${tasaEA}% EA`} color={C.red} />
+            <MetricCard label="Total intereses" value={fmtM(amort.totalIntereses)} sub={`${amort.mesFin} meses`} color={C.amber} />
+            <MetricCard label="Pago total en" value={`Mes ${amort.mesFin}`} sub={`Año ${Math.ceil(amort.mesFin/12)} · ${amort.mesFin < amort.mesSinAbonos ? `${amort.mesSinAbonos - amort.mesFin} meses antes` : "sin adelanto"}`} color={C.teal} highlight={amort.mesFin < amort.mesSinAbonos} />
+            <MetricCard label="Ahorro en intereses" value={fmtM(amort.ahorroAbonos)} sub={amort.totalAbonos > 0 ? `Abonos: ${fmtM(amort.totalAbonos)}` : "Sin abonos aún"} color={amort.ahorroAbonos > 0 ? C.green : C.muted} highlight={amort.ahorroAbonos > 0} />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 14, alignItems: "start" }}>
+
+            {/* Panel izquierdo: parámetros + abonos */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>Parámetros del crédito</div>
+                <Slider label="Tasa efectiva anual (%)" value={tasaEA} min={5} max={20} step={0.1} format={(v) => `${v.toFixed(1)}%`} onChange={setTasaEA} color={C.amber} />
+                <Slider label="Plazo (meses)" value={plazoMeses} min={60} max={360} step={12} format={(v) => `${v} meses (${v/12} años)`} onChange={setPlazoMeses} />
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, color: C.textDim }}>Saldo inicial</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{fmtM(saldoInicial)}</span>
+                  </div>
+                  <input
+                    type="number" value={saldoInicial} step={1000000}
+                    onChange={(e) => setSaldoInicial(Math.max(0, Number(e.target.value)))}
+                    style={{ width: "100%", padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                  />
+                </div>
+                <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 12, color: C.muted }}>Cuota calculada</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.red, fontVariantNumeric: "tabular-nums" }}>{fmt(amort.cuota)}</span>
+                </div>
+              </div>
+
+              {/* Abonos a capital */}
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>Abonos a capital</div>
+                {abonos.length === 0 && (
+                  <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>Sin abonos registrados</div>
+                )}
+                {abonos.map((ab, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 10, color: C.muted, marginBottom: 3 }}>Mes</div>
+                      <input
+                        type="number" value={ab.mes} min={1} max={plazoMeses}
+                        onChange={(e) => setAbonos(prev => prev.map((a, j) => j === i ? { ...a, mes: Number(e.target.value) } : a))}
+                        style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 12, outline: "none", boxSizing: "border-box" }}
+                      />
+                    </div>
+                    <div style={{ flex: 2 }}>
+                      <div style={{ fontSize: 10, color: C.muted, marginBottom: 3 }}>Monto (COP)</div>
+                      <input
+                        type="number" value={ab.monto} min={0} step={1000000}
+                        onChange={(e) => setAbonos(prev => prev.map((a, j) => j === i ? { ...a, monto: Number(e.target.value) } : a))}
+                        style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 12, outline: "none", boxSizing: "border-box" }}
+                      />
+                    </div>
+                    <button onClick={() => setAbonos(prev => prev.filter((_, j) => j !== i))}
+                      style={{ marginTop: 14, padding: "6px 10px", borderRadius: 6, border: `1px solid ${C.red}44`, background: "transparent", color: C.red, cursor: "pointer", fontSize: 13, flexShrink: 0 }}>
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => setAbonos(prev => [...prev, { mes: (prev[prev.length - 1]?.mes || 0) + 12, monto: 10000000 }])}
+                  style={{ width: "100%", padding: "8px", borderRadius: 7, border: `1px dashed ${C.accent}66`, background: "transparent", color: C.accent, cursor: "pointer", fontSize: 12, marginTop: 4 }}>
+                  + Agregar abono
+                </button>
+              </div>
+            </div>
+
+            {/* Panel derecho: charts */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+              {/* Saldo en el tiempo */}
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>Saldo de la deuda en el tiempo</div>
+                <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
+                  <span style={{ fontSize: 11, color: C.teal, display: "flex", alignItems: "center", gap: 4 }}><span style={{ display: "inline-block", width: 16, height: 2, background: C.teal }} /> Con abonos</span>
+                  <span style={{ fontSize: 11, color: C.muted, display: "flex", alignItems: "center", gap: 4 }}><span style={{ display: "inline-block", width: 16, height: 2, background: C.muted, opacity: 0.5 }} /> Sin abonos</span>
+                </div>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={amort.saldoAnual} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
+                    <XAxis dataKey="año" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={44} />
+                    <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} formatter={(v) => [fmtM(v)]} labelStyle={{ color: C.text, fontWeight: 600 }} />
+                    <ReferenceLine y={0} stroke={C.border} />
+                    <Line type="monotone" dataKey="sinAbonos" stroke={C.muted} strokeWidth={1.5} dot={false} strokeOpacity={0.5} name="Sin abonos" />
+                    <Line type="monotone" dataKey="conAbonos" stroke={C.teal} strokeWidth={2.5} dot={false} name="Con abonos" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Intereses vs capital por año */}
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, letterSpacing: "0.06em", textTransform: "uppercase" }}>Intereses vs capital pagado por año</div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={amort.intCapAnual} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
+                    <XAxis dataKey="año" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(0)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={44} />
+                    <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} formatter={(v) => [fmtM(v)]} labelStyle={{ color: C.text, fontWeight: 600 }} />
+                    <Bar dataKey="interes" name="Intereses" fill={`${C.red}55`} stroke={C.red} strokeWidth={1} radius={[3, 3, 0, 0]} stackId="a" />
+                    <Bar dataKey="principal" name="Capital" fill={`${C.teal}55`} stroke={C.teal} strokeWidth={1} radius={[3, 3, 0, 0]} stackId="a" />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
+                  <span style={{ fontSize: 11, color: C.red, display: "flex", alignItems: "center", gap: 4 }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.red }} /> Intereses</span>
+                  <span style={{ fontSize: 11, color: C.teal, display: "flex", alignItems: "center", gap: 4 }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.teal }} /> Capital</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabla de amortización */}
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>Tabla de amortización · {amort.schedule.length} pagos</span>
+              <button onClick={() => setVerTodaTabla(v => !v)}
+                style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.accent, cursor: "pointer", fontSize: 11 }}>
+                {verTodaTabla ? "Ver menos" : "Ver todo"}
+              </button>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                    {["Mes", "Cuota", "Interés", "Capital", "Abono", "Saldo"].map(h => (
+                      <th key={h} style={{ padding: "8px 12px", fontSize: 11, color: C.muted, fontWeight: 600, textAlign: h === "Mes" ? "left" : "right" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(verTodaTabla ? amort.schedule : amort.schedule.slice(0, 24)).map((row) => (
+                    <tr key={row.mes} style={{ borderBottom: `1px solid ${C.border}`, background: row.abono > 0 ? `${C.amber}11` : "transparent" }}>
+                      <td style={{ padding: "7px 12px", fontSize: 12, color: C.textDim, fontWeight: 600 }}>
+                        {row.mes}
+                        {row.abono > 0 && <span style={{ marginLeft: 6, fontSize: 9, color: C.amber, textTransform: "uppercase" }}>abono</span>}
+                      </td>
+                      <td style={{ padding: "7px 12px", fontSize: 11, color: C.text, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt(row.cuota)}</td>
+                      <td style={{ padding: "7px 12px", fontSize: 11, color: C.red, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt(row.interes)}</td>
+                      <td style={{ padding: "7px 12px", fontSize: 11, color: C.teal, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt(row.principal)}</td>
+                      <td style={{ padding: "7px 12px", fontSize: 11, color: C.amber, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{row.abono > 0 ? fmt(row.abono) : "—"}</td>
+                      <td style={{ padding: "7px 12px", fontSize: 12, fontWeight: 600, color: C.text, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtM(row.saldo)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!verTodaTabla && amort.schedule.length > 24 && (
+              <div style={{ padding: "10px 16px", fontSize: 11, color: C.muted, borderTop: `1px solid ${C.border}` }}>
+                Mostrando 24 de {amort.schedule.length} pagos · <span style={{ color: C.accent, cursor: "pointer" }} onClick={() => setVerTodaTabla(true)}>Ver todos</span>
+              </div>
+            )}
           </div>
         </div>
       )}
