@@ -133,11 +133,13 @@ function MesRow({ data, onChange }) {
       <td style={{ padding: "4px 8px", width: 160 }}>
         {data.fase === "activo" ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ flex: 1, height: 3, background: C.border, borderRadius: 2, position: "relative" }}>
-              <div style={{ position: "absolute", left: 0, width: `${data.ocup}%`, height: "100%", background: data.ocup >= 70 ? C.green : data.ocup >= 55 ? C.amber : C.red, borderRadius: 2 }} />
+            <div style={{ flex: 1, height: 20, position: "relative" }}>
+              <div style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", left: 0, right: 0, height: 3, background: C.border, borderRadius: 2 }}>
+                <div style={{ position: "absolute", left: 0, width: `${data.ocup}%`, height: "100%", background: data.ocup >= 70 ? C.green : data.ocup >= 55 ? C.amber : C.red, borderRadius: 2 }} />
+              </div>
               <input type="range" min={20} max={95} step={1} value={data.ocup}
                 onChange={(e) => onChange({ ...data, ocup: Number(e.target.value) })}
-                style={{ position: "absolute", top: "50%", left: 0, width: "100%", height: 16, transform: "translateY(-50%)", opacity: 0, cursor: "pointer", margin: 0 }} />
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", margin: 0 }} />
             </div>
             <span style={{ fontSize: 12, color: C.text, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{data.ocup}%</span>
           </div>
@@ -146,11 +148,13 @@ function MesRow({ data, onChange }) {
       <td style={{ padding: "4px 8px", width: 160 }}>
         {data.fase === "activo" ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ flex: 1, height: 3, background: C.border, borderRadius: 2, position: "relative" }}>
-              <div style={{ position: "absolute", left: 0, width: `${((data.tarifa - 100000) / 250000) * 100}%`, height: "100%", background: C.accent, borderRadius: 2 }} />
-              <input type="range" min={100000} max={350000} step={5000} value={data.tarifa}
+            <div style={{ flex: 1, height: 20, position: "relative" }}>
+              <div style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", left: 0, right: 0, height: 3, background: C.border, borderRadius: 2 }}>
+                <div style={{ position: "absolute", left: 0, width: `${((data.tarifa - 100000) / 250000) * 100}%`, height: "100%", background: C.accent, borderRadius: 2 }} />
+              </div>
+              <input type="range" min={100000} max={350000} step={1000} value={data.tarifa}
                 onChange={(e) => onChange({ ...data, tarifa: Number(e.target.value) })}
-                style={{ position: "absolute", top: "50%", left: 0, width: "100%", height: 16, transform: "translateY(-50%)", opacity: 0, cursor: "pointer", margin: 0 }} />
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", margin: 0 }} />
             </div>
             <span style={{ fontSize: 11, color: C.text, minWidth: 58, fontVariantNumeric: "tabular-nums" }}>{fmt(data.tarifa)}</span>
           </div>
