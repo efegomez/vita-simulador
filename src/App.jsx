@@ -479,11 +479,11 @@ export default function App() {
 
             {/* Gráfico flujo neto mensual */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>Flujo neto mensual</div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>Ingresos vs Egresos por mes</div>
               <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>
-                <span style={{ marginRight: 14 }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.amber, marginRight: 4 }} />Solo hipoteca</span>
-                <span style={{ marginRight: 14 }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.green, marginRight: 4 }} />Flujo positivo</span>
-                <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.red, marginRight: 4 }} />Flujo negativo</span>
+                <span style={{ marginRight: 14 }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.green, marginRight: 4 }} />Ingresos</span>
+                <span style={{ marginRight: 14 }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: C.red, marginRight: 4 }} />Egresos</span>
+                <span><span style={{ display: "inline-block", width: 16, height: 2, background: C.teal, marginRight: 4, verticalAlign: "middle" }} />Flujo neto</span>
               </div>
               <ResponsiveContainer width="100%" height={230}>
                 <ComposedChart data={calc.chart36} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
@@ -491,15 +491,12 @@ export default function App() {
                   <XAxis dataKey="label" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} width={40} />
                   <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }}
-                    formatter={(v, n) => [fmt(v), n === "flujo" ? "Flujo mensual" : "Acumulado"]}
+                    formatter={(v, n) => [fmt(v), n === "ingBruto" ? "Ingresos" : n === "egTotal" ? "Egresos" : "Flujo neto"]}
                     labelStyle={{ color: C.text, fontWeight: 600 }} />
                   <ReferenceLine y={0} stroke={C.border} strokeWidth={1} />
-                  <Bar dataKey="flujo" radius={[4, 4, 0, 0]} label={false}>
-                    {calc.chart36.map((m, i) => (
-                      <Cell key={i} fill={m.fase === "preentrega" ? C.muted : m.fase === "soloHipoteca" ? C.amber : m.flujo >= 0 ? C.green : C.red} />
-                    ))}
-                  </Bar>
-                  <Line type="monotone" dataKey="flujo" stroke={C.teal} strokeWidth={2} dot={false} name="Flujo neto" />
+                  <Bar dataKey="ingBruto" name="ingBruto" fill={`${C.green}88`} stroke={C.green} strokeWidth={1} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="egTotal"  name="egTotal"  fill={`${C.red}88`}   stroke={C.red}   strokeWidth={1} radius={[3, 3, 0, 0]} />
+                  <Line type="monotone" dataKey="flujo" stroke={C.teal} strokeWidth={2} dot={false} name="flujo" />
                   <Brush dataKey="label" height={22} startIndex={0} endIndex={11} stroke={C.border} fill={C.surface} travellerWidth={7} />
                 </ComposedChart>
               </ResponsiveContainer>
