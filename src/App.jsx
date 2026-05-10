@@ -499,7 +499,7 @@ export default function App() {
                       <Cell key={i} fill={m.fase === "preentrega" ? C.muted : m.fase === "soloHipoteca" ? C.amber : m.flujo >= 0 ? C.green : C.red} />
                     ))}
                   </Bar>
-                  <Line type="monotone" dataKey="flujoAcum" stroke={C.teal} strokeWidth={2} dot={false} name="flujoAcum" />
+                  <Line type="monotone" dataKey="flujo" stroke={C.teal} strokeWidth={2} dot={false} name="Flujo neto" />
                   <Brush dataKey="label" height={22} startIndex={0} endIndex={11} stroke={C.border} fill={C.surface} travellerWidth={7} />
                 </ComposedChart>
               </ResponsiveContainer>
